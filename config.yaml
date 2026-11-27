@@ -1,0 +1,50 @@
+# job-agent configuration
+
+llm:
+  provider: openrouter
+  base_url: https://openrouter.ai/api/v1
+  # Fallback chain — free catalog churns, so the client walks this list until one answers.
+  # openrouter/free auto-routes to whatever free model supports structured output today.
+  models:
+    - nvidia/nemotron-3-super-120b-a12b:free
+    - google/gemma-4-31b-it:free
+    - openai/gpt-oss-20b:free
+    - openrouter/free
+  # Free tier: ~20 req/min, 50 req/day (1000/day after a one-time $10 credit purchase).
+  max_requests_per_day: 48
+  min_seconds_between_calls: 4
+
+candidate:
+  profile_file: profile/profile.md
+  resume_file: profile/resume.pdf
+  first_name: ""          # your first name
+  last_name: ""           # your last name
+  email: ""               # the email you apply with
+  phone: ""            # fill in
+  location: ""         # e.g. "Toronto, Canada" or "Remote"
+  linkedin: ""
+  github: ""
+  website: ""
+  work_authorization: ""   # e.g. "Authorized to work in Canada; no sponsorship needed"
+
+search:
+  keywords:
+    - forward deployed engineer
+    - ai engineer
+    - llm engineer
+    - machine learning engineer
+  # Exact ATS board slugs to watch (the token in the company's careers URL).
+  greenhouse_boards: []      # e.g. [anthropic, stripe]
+  lever_companies: []        # e.g. [netflix]
+  ashby_boards: []           # e.g. [ramp]
+  remotive_search: true      # keyword discovery across companies
+  locations_allow: [remote, worldwide]   # add your country and cities, lower case
+
+matching:
+  min_score: 70          # 0-100; below this the job is skipped
+  max_applications_per_run: 5
+
+apply:
+  auto_submit: false     # false = fill everything, save a review screenshot, don't click submit. Keep it false until you trust the output
+  headless: true
+  skip_if_captcha: true  # never attempt captcha-protected forms
