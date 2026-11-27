@@ -110,14 +110,20 @@ has a fallback chain; edit `llm.models` if all of them stop responding.
 
 ## Known limits
 
-- **CAPTCHA forms are skipped** and logged with the URL so you can apply by
-  hand. The agent does not bypass bot protection.
+- **CAPTCHA forms are never filled.** The agent does not bypass bot protection.
+  Instead it reads the form's questions and writes an application kit to
+  `data/kits/`: a cover letter plus answers, for you to paste and submit by
+  hand. Many Greenhouse and Ashby forms carry a CAPTCHA, so expect the kit to
+  be the usual outcome.
+- **Listing pages have no form.** Jobs found through Remotive often link to a
+  listing page; those are marked `failed` with "no application form".
 - **LinkedIn and Indeed are not supported.** Their terms prohibit automation
   and accounts get banned. Company career pages are the reliable path.
 - Unusual form widgets (multi-step wizards, some dropdowns) can end as
   `failed`. Check the screenshot and apply by hand.
-- This is a personal project shared as is. Job discovery has been tested; form
-  filling depends on each company's form, so expect some to need manual work.
+- This is a personal project shared as is. Tested on real boards: discovery,
+  scoring and the application kit. Automatic form filling has not been
+  confirmed on a live company form, because the forms tested had a CAPTCHA.
 
 ## The part the agent cannot do
 

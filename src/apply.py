@@ -86,6 +86,25 @@ def collect_questions(page) -> list[tuple[object, str]]:
     return out
 
 
+KITS = Path(__file__).resolve().parent.parent / "data" / "kits"
+
+
+def _write_kit(job, labels: list, tailor_fn) -> str:
+    """Cover letter + answers to the form's own questions, as a file to paste from."""
+    KITS.mkdir(parents=True, exist_ok=True)
+    custom = [lab for lab in dict.fromkeys(labels) if _classify(lab) is None]
+    content = tailor_fn(custom)
+    path = KITS / f"{job['job_id'].replace(':', '_')}.md"
+    lines = [f"# {job['title']} @ {job['company']}", "", f"Apply here: {job['apply_url']}", "",
+             "## Cover letter", "", str(content.get("cover_letter") or ""), "", "## Answers", ""]
+    norm = lambda t: " ".join(str(t).split())
+    answers = {norm(k): v for k, v in (content.get("answers") or {}).items()}
+    for q in custom:
+        lines += [f"**{norm(q)}**", "", str(answers.get(norm(q), "") or "(no answer: fill by hand)"), ""]
+    path.write_text("\n".join(lines))
+    return f"data/kits/{path.name}"
+
+
 def apply_to_job(job, candidate: dict, tailor_fn, cfg: dict) -> tuple[str, str]:
     """Returns (status, note). status in: applied|queued|captcha|failed."""
     values = {
@@ -111,18 +130,30 @@ def apply_to_job(job, candidate: dict, tailor_fn, cfg: dict) -> tuple[str, str]:
             page.wait_for_timeout(3000)
 
             if cfg.get("skip_if_captcha", True) and _has_captcha(page):
-                return "captcha", "captcha on form — apply manually: " + job["apply_url"]
+                # Never fill or submit a captcha-protected form. Instead read the form's
+                # questions and write an application kit the candidate submits by hand.
+                kit = _write_kit(job, [lab for _, lab in collect_questions(page)], tailor_fn)
+                return "captcha", f"captcha on form — apply manually with {kit}: " + job["apply_url"]
 
             # Resume upload first: some ATSes autofill fields from it.
+            uploaded = False
+            filled = 0
             for finput in page.query_selector_all("input[type='file']"):
                 try:
                     finput.set_input_files(resume)
                     page.wait_for_timeout(4000)
+                    uploaded = True
                     break
                 except Exception:
                     continue
 
             fields = collect_questions(page)
+            has_form = uploaded or any(_classify(lab) in ("first_name", "last_name", "full_name", "email")
+                                       for _, lab in fields)
+            if not has_form:
+                # A listing page (e.g. Remotive) or a page that only links out: nothing to fill.
+                page.screenshot(path=str(shot), full_page=True)
+                return "failed", "no application form on this page — apply manually: " + job["apply_url"]
             custom = [(el, lab) for el, lab in fields if _classify(lab) is None
                       and el.evaluate("e => e.tagName.toLowerCase()") != "select"]
             content = tailor_fn([lab for _, lab in custom])
@@ -133,12 +164,14 @@ def apply_to_job(job, candidate: dict, tailor_fn, cfg: dict) -> tuple[str, str]:
                     tag = el.evaluate("e => e.tagName.toLowerCase()")
                     if std and values.get(std) and tag != "select":
                         el.fill(values[std])
+                        filled += 1
                     elif not std and tag != "select":
                         answer = content["answers"].get(lab, "")
                         if not answer and "cover letter" in lab.lower():
                             answer = content["cover_letter"]
                         if answer:
-                            el.fill(answer)
+                            el.fill(str(answer))
+                            filled += 1
                 except Exception:
                     continue
 
@@ -153,7 +186,9 @@ def apply_to_job(job, candidate: dict, tailor_fn, cfg: dict) -> tuple[str, str]:
             page.screenshot(path=str(shot), full_page=True)
 
             if not cfg.get("auto_submit", False):
-                return "queued", f"filled, not submitted (auto_submit=false); review {shot.name}"
+                return "queued", (f"filled {filled} of {len(fields)} fields, resume "
+                                  f"{'attached' if uploaded else 'NOT attached'}, not submitted "
+                                  f"(auto_submit=false); review {shot.name}")
 
             if _has_captcha(page):
                 return "captcha", "captcha appeared before submit — apply manually"

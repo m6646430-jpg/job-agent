@@ -94,7 +94,12 @@ class LLM:
                     errors.append(f"{model}: {data['error']}")
                     continue
                 self._record_call()
-                return data["choices"][0]["message"]["content"]
+                content = data["choices"][0]["message"].get("content")
+                if not content or not content.strip():
+                    # Some free models return an empty answer: try the next one.
+                    errors.append(f"{model}: empty answer")
+                    continue
+                return content
             except requests.RequestException as e:
                 errors.append(f"{model}: {e}")
                 continue
